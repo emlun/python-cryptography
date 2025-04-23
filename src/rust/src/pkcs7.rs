@@ -13,8 +13,7 @@ use cryptography_x509::{common, oid, pkcs7};
 use once_cell::sync::Lazy;
 #[cfg(not(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC)))]
 use openssl::pkcs7::Pkcs7;
-use pyo3::types::{PyAnyMethods, PyBool, PyBytesMethods, PyListMethods};
-use pyo3::BoundObject;
+use pyo3::types::{PyAnyMethods, PyBytesMethods, PyListMethods};
 #[cfg(not(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC)))]
 use pyo3::PyTypeInfo;
 
@@ -493,6 +492,7 @@ fn sign_and_serialize<'p>(
         pyo3::Bound<'_, pyo3::PyAny>,
         pyo3::Bound<'_, pyo3::PyAny>,
         pyo3::Bound<'_, pyo3::PyAny>,
+        pyo3::Bound<'_, pyo3::PyAny>,
     )> = builder.getattr(pyo3::intern!(py, "_signers"))?.extract()?;
 
     let py_certs: Vec<pyo3::PyRef<'p, x509::certificate::Certificate>> = builder
@@ -508,7 +508,9 @@ fn sign_and_serialize<'p>(
 
     let ka_vec = cryptography_keepalive::KeepAlive::new();
     let ka_bytes = cryptography_keepalive::KeepAlive::new();
-    for (cert, py_private_key, py_hash_alg, rsa_padding) in py_signers.iter() {
+    for (cert, py_private_key, py_hash_alg, rsa_padding, ecdsa_deterministic_signing) in
+        py_signers.iter()
+    {
         let (authenticated_attrs, signature) =
             if options.contains(&types::PKCS7_NO_ATTRIBUTES.get(py)?)? {
                 (
@@ -518,7 +520,7 @@ fn sign_and_serialize<'p>(
                         py_private_key.clone(),
                         py_hash_alg.clone(),
                         rsa_padding.clone(),
-                        PyBool::new(py, false).into_bound().into_any(),
+                        ecdsa_deterministic_signing.clone(),
                         &data_with_header,
                     )?,
                 )
@@ -568,7 +570,7 @@ fn sign_and_serialize<'p>(
                         py_private_key.clone(),
                         py_hash_alg.clone(),
                         rsa_padding.clone(),
-                        PyBool::new(py, false).into_bound().into_any(),
+                        ecdsa_deterministic_signing.clone(),
                         &signed_data,
                     )?,
                 )

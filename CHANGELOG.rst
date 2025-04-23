@@ -59,8 +59,9 @@ Changelog
 * Added support for compiling against `aws-lc`_.
 * Added support for deterministic ECDSA signing via the new keyword-only argument ``ecdsa_deterministic_signing`` in
   :meth:`~cryptography.x509.CertificateBuilder.sign`,
-  :meth:`~cryptography.x509.CertificateRevocationListBuilder.sign`
-  and :meth:`~cryptography.x509.CertificateSigningRequestBuilder.sign`.
+  :meth:`~cryptography.x509.CertificateRevocationListBuilder.sign`,
+  :meth:`~cryptography.x509.CertificateSigningRequestBuilder.sign`,
+  and :meth:`~cryptography.hazmat.primitives.serialization.pkcs7.PKCS7SignatureBuilder.add_signer`.
 
 .. _v44-0-2:
 

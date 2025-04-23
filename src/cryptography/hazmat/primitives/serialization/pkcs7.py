@@ -63,6 +63,7 @@ class PKCS7SignatureBuilder:
                 PKCS7PrivateKeyTypes,
                 PKCS7HashTypes,
                 padding.PSS | padding.PKCS1v15 | None,
+                bool,
             ]
         ] = [],
         additional_certs: list[x509.Certificate] = [],
@@ -85,6 +86,7 @@ class PKCS7SignatureBuilder:
         hash_algorithm: PKCS7HashTypes,
         *,
         rsa_padding: padding.PSS | padding.PKCS1v15 | None = None,
+        ecdsa_deterministic_signing: bool = False,
     ) -> PKCS7SignatureBuilder:
         if not isinstance(
             hash_algorithm,
@@ -117,7 +119,13 @@ class PKCS7SignatureBuilder:
             self._data,
             [
                 *self._signers,
-                (certificate, private_key, hash_algorithm, rsa_padding),
+                (
+                    certificate,
+                    private_key,
+                    hash_algorithm,
+                    rsa_padding,
+                    ecdsa_deterministic_signing,
+                ),
             ],
         )
 

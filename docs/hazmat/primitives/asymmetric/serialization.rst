@@ -1220,7 +1220,7 @@ contain certificates, CRLs, and much more. PKCS7 files commonly have a ``p7b``,
         :param data: The data to be hashed and signed.
         :type data: :term:`bytes-like`
 
-    .. method:: add_signer(certificate, private_key, hash_algorithm, *, rsa_padding=None)
+    .. method:: add_signer(certificate, private_key, hash_algorithm, *, rsa_padding=None, ecdsa_deterministic_signing=False)
 
         :param certificate: The :class:`~cryptography.x509.Certificate`.
 
@@ -1246,6 +1246,16 @@ contain certificates, CRLs, and much more. PKCS7 files commonly have a ``p7b``,
             with those respective paddings. If this is ``None`` then RSA
             keys will default to ``PKCS1v15`` padding. All other key types **must**
             not pass a value other than ``None``.
+
+        :param bool ecdsa_deterministic_signing:
+
+            .. versionadded:: 45.0.0
+
+            A Boolean flag defaulting to ``False`` that specifies whether the
+            signing procedure should be deterministic or not, as defined in
+            :rfc:`6979`. This only impacts the signing process, verification is
+            not affected (the verification process is the same for both
+            deterministic and non-deterministic signed messages).
 
     .. method:: add_certificate(certificate)
 
