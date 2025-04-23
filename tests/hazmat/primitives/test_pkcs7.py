@@ -4,6 +4,7 @@
 
 
 import contextlib
+import datetime
 import email.parser
 import os
 import typing
@@ -15,13 +16,17 @@ from cryptography import exceptions, x509
 from cryptography.exceptions import _Reasons
 from cryptography.hazmat.bindings._rust import test_support
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519, padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.serialization import pkcs7
 from tests.x509.test_x509 import _generate_ca_and_leaf
 
 from ...hazmat.primitives.fixtures_rsa import (
     RSA_KEY_2048_ALT,
+)
+from ...hazmat.primitives.test_ec import (
+    _skip_curve_unsupported,
+    _skip_deterministic_ecdsa_unsupported,
 )
 from ...hazmat.primitives.test_rsa import rsa_key_2048
 from ...utils import load_vectors_from_file, raises_unsupported_algorithm
@@ -318,6 +323,100 @@ class TestPKCS7SignatureBuilder:
         )
 
         sig = builder.sign(serialization.Encoding.SMIME, options)
+        assert bytes(data) in sig
+        test_support.pkcs7_verify(
+            serialization.Encoding.SMIME,
+            sig,
+            data,
+            [cert],
+            options,
+        )
+
+        data = bytearray(b"")
+        builder = (
+            pkcs7.PKCS7SignatureBuilder()
+            .set_data(data)
+            .add_signer(cert, key, hashes.SHA256())
+        )
+
+        sig = builder.sign(serialization.Encoding.SMIME, options)
+        test_support.pkcs7_verify(
+            serialization.Encoding.SMIME,
+            sig,
+            data,
+            [cert],
+            options,
+        )
+
+    @pytest.mark.parametrize(
+        ("hashalg", "curve", "expect_sig_hex"),
+        [
+            (
+                hashes.SHA256,
+                ec.SECP256R1,
+                "4d494d452d56657273696f6e3a20312e300d0a436f6e74656e742d547970653a206d756c7469706172742f7369676e65643b2070726f746f636f6c3d226170706c69636174696f6e2f782d706b6373372d7369676e6174757265223b206d6963616c673d227368612d323536223b20626f756e646172793d223d3d3d3d3d3d3d3d3d3d3d3d3d3d3d303331333833333431323836333638363335363d3d220d0a0d0a5468697320697320616e20532f4d494d45207369676e6564206d6573736167650d0a0d0a2d2d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d303331333833333431323836333638363335363d3d0d0a68656c6c6f20776f726c640d0a2d2d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d303331333833333431323836333638363335363d3d0d0a436f6e74656e742d547970653a206170706c69636174696f6e2f782d706b6373372d7369676e61747572653b206e616d653d22736d696d652e703773220d0a436f6e74656e742d5472616e736665722d456e636f64696e673a206261736536340d0a436f6e74656e742d446973706f736974696f6e3a206174746163686d656e743b2066696c656e616d653d22736d696d652e703773220d0a0d0a4d4949436177594a4b6f5a496876634e415163436f49494358444343416c674341514578447a414e42676c67686b67425a514d45416745464144414c42676b710d0a686b694739773042427747676767454b4d494942426a43427271414441674543416749444354414b42676771686b6a4f50515144416a414e4d517377435159440d0a5651514745774a56557a4165467730774d6a41784d4445784d6a41784d4442614677307a4d4445794d7a45774f444d774d4442614d413078437a414a42674e560d0a42415954416c56544d466b77457759484b6f5a497a6a3043415159494b6f5a497a6a304441516344516741455970305836612b597975613235586a3934615a2f0d0a5a584d4c634a6c36706d5957326d69703170656e6d327a3642417547366b424a2b424a433371716775796e3447666376414157334a73756b436838316f7075310d0a447a414b42676771686b6a4f5051514441674e484144424541694176487249646a576879546e6a512f50637a616e4f376b666b2b686741415556556f31684d490d0a6e46327745514967502f42485255672f53644757744158373166354655624278634546365558773277593948396e45364c3230786767456c4d494942495149420d0a415441544d413078437a414a42674e5642415954416c5654416749444354414e42676c67686b67425a514d4541674546414b43426f54415942676b71686b69470d0a3977304243514d784377594a4b6f5a496876634e415163424d42774743537147534962334451454a42544550467730794e5441304d6a4d784e4449794d4442610d0a4d43384743537147534962334451454a4244456942434335545365356b30302b434b557555746661666176367849547634337054674f36516950657334752f4e0d0a3654413242676b71686b694739773042435138784b54416e4d417347435743475341466c417751424b6a414c42676c67686b67425a514d45415259774377594a0d0a59495a4941575544424145434d416f4743437147534d343942414d43424567775267496841504a4e624166326c6456596e703939663654494b354537644a646c0d0a5a4f7461735a6b65585861364f4a764d4169454131757372517a584974494f704e4b6442316a765771556947325a6c353571484c77644764312b77466d4f553d0d0a0d0a2d2d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d303331333833333431323836333638363335363d3d2d2d0d0a",
+            ),
+        ],
+    )
+    def test_sign_byteslike_deterministic_ecdsa(
+        self, hashalg, curve, expect_sig_hex, backend
+    ):
+        _skip_curve_unsupported(backend, curve())
+        _skip_deterministic_ecdsa_unsupported(backend)
+        if not backend.signature_hash_supported(hashalg()):
+            pytest.skip(f"{hashalg} signature not supported")
+
+        data = bytearray(b"hello world")
+        cert, key = _load_cert_key()
+
+        h = hashes.Hash(hashalg())
+        h.update(b"test_build_cert_with_deterministic_ecdsa_signature.issuer")
+        private_value = int.from_bytes(h.finalize(), "big")
+        issuer_private_key = ec.derive_private_key(private_value, curve())
+        h = hashes.Hash(hashalg())
+        h.update(b"test_build_cert_with_deterministic_ecdsa_signature.subject")
+        private_value = int.from_bytes(h.finalize(), "big")
+        subject_private_key = ec.derive_private_key(private_value, curve())
+
+        not_valid_before = datetime.datetime(2002, 1, 1, 12, 1)
+        not_valid_after = datetime.datetime(2030, 12, 31, 8, 30)
+
+        certbuilder = (
+            x509.CertificateBuilder()
+            .serial_number(777)
+            .issuer_name(
+                x509.Name(
+                    [x509.NameAttribute(x509.oid.NameOID.COUNTRY_NAME, "US")]
+                )
+            )
+            .subject_name(
+                x509.Name(
+                    [x509.NameAttribute(x509.oid.NameOID.COUNTRY_NAME, "US")]
+                )
+            )
+            .public_key(subject_private_key.public_key())
+            .not_valid_before(not_valid_before)
+            .not_valid_after(not_valid_after)
+        )
+
+        cert = certbuilder.sign(
+            issuer_private_key,
+            hashalg(),
+            backend,
+            ecdsa_deterministic_signing=True,
+        )
+
+        options = [pkcs7.PKCS7Options.DetachedSignature]
+        builder = (
+            pkcs7.PKCS7SignatureBuilder()
+            .set_data(data)
+            .add_signer(
+                cert, key, hashes.SHA256(), ecdsa_deterministic_signing=True
+            )
+        )
+
+        sig = builder.sign(serialization.Encoding.SMIME, options)
+        assert sig.hex() == expect_sig_hex
         assert bytes(data) in sig
         test_support.pkcs7_verify(
             serialization.Encoding.SMIME,
