@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import datetime
 import email.base64mime
 import email.generator
 import email.message
@@ -144,6 +145,8 @@ class PKCS7SignatureBuilder:
         encoding: serialization.Encoding,
         options: Iterable[PKCS7Options],
         backend: typing.Any = None,
+        *,
+        time: datetime.datetime | None = None,
     ) -> bytes:
         if len(self._signers) == 0:
             raise ValueError("Must have at least one signer")
@@ -191,7 +194,9 @@ class PKCS7SignatureBuilder:
                 "both values."
             )
 
-        return rust_pkcs7.sign_and_serialize(self, encoding, options)
+        return rust_pkcs7.sign_and_serialize(
+            self, encoding, options, time=time
+        )
 
 
 class PKCS7EnvelopeBuilder:

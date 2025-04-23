@@ -2,6 +2,7 @@
 # 2.0, and the BSD License. See the LICENSE file in the root of this repository
 # for complete details.
 
+import datetime
 from collections.abc import Iterable
 
 from cryptography import x509
@@ -23,6 +24,7 @@ def sign_and_serialize(
     builder: pkcs7.PKCS7SignatureBuilder,
     encoding: serialization.Encoding,
     options: Iterable[pkcs7.PKCS7Options],
+    time: datetime.datetime | None = None,
 ) -> bytes: ...
 def decrypt_der(
     data: bytes,

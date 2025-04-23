@@ -14,6 +14,7 @@ use once_cell::sync::Lazy;
 #[cfg(not(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC)))]
 use openssl::pkcs7::Pkcs7;
 use pyo3::types::{PyAnyMethods, PyBytesMethods, PyListMethods};
+use pyo3::BoundObject;
 #[cfg(not(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC)))]
 use pyo3::PyTypeInfo;
 
@@ -27,6 +28,7 @@ use crate::pkcs12::symmetric_encrypt;
 use crate::utils::cstr_from_literal;
 #[cfg(not(any(CRYPTOGRAPHY_IS_BORINGSSL, CRYPTOGRAPHY_IS_AWSLC)))]
 use crate::x509::certificate::load_der_x509_certificate;
+use crate::x509::py_to_datetime;
 use crate::{exceptions, types, x509};
 
 const PKCS7_CONTENT_TYPE_OID: asn1::ObjectIdentifier = asn1::oid!(1, 2, 840, 113549, 1, 9, 3);
@@ -461,6 +463,7 @@ fn sign_and_serialize<'p>(
     builder: &pyo3::Bound<'p, pyo3::PyAny>,
     encoding: &pyo3::Bound<'p, pyo3::PyAny>,
     options: &pyo3::Bound<'p, pyo3::types::PyList>,
+    time: &pyo3::Bound<'p, pyo3::PyAny>,
 ) -> CryptographyResult<pyo3::Bound<'p, pyo3::types::PyBytes>> {
     let raw_data: CffiBuf<'p> = builder.getattr(pyo3::intern!(py, "_data"))?.extract()?;
     let text_mode = options.contains(types::PKCS7_TEXT.get(py)?)?;
@@ -475,7 +478,9 @@ fn sign_and_serialize<'p>(
         };
 
     let content_type_bytes = asn1::write_single(&pkcs7::PKCS7_DATA_OID)?;
-    let now = x509::common::datetime_now(py)?;
+    let now = (!time.is_none())
+        .then(|| py_to_datetime(py, time.as_borrowed().into_bound()))
+        .unwrap_or_else(|| x509::common::datetime_now(py))?;
     let signing_time_bytes = asn1::write_single(&x509::certificate::time_from_datetime(now)?)?;
     let smime_cap_bytes = asn1::write_single(&asn1::SequenceOfWriter::new([
         // Subset of values OpenSSL provides:
